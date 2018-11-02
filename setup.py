@@ -21,7 +21,7 @@ def generate_content():
     from generator import mavgen, mavparse
 
     # path to message_definitions directory
-    if os.getenv("MDEF",None) is not None:
+    if os.getenv("MDEF", None) is not None:
         mdef_paths = [os.getenv("MDEF")]
     else:
         mdef_paths = [os.path.join('..', 'message_definitions'),
@@ -74,19 +74,6 @@ def generate_content():
                 print("Building failed %s for protocol 2.0" % xml)
                 sys.exit(1)
 
-extensions = []  # Assume we might be unable to build native code
-if platform.system() != 'Windows':
-    extensions = [ Extension('mavnative',
-                   sources=['mavnative/mavnative.c'],
-                   include_dirs=[
-                       'generator/C/include_v1.0',
-                       'generator/C/include_v2.0',
-                       'mavnative'
-                       ]
-                   ) ]
-else:
-    print("Skipping mavnative due to Windows possibly missing a compiler...")
-
 
 class custom_build_py(build_py):
     def run(self):
@@ -128,8 +115,7 @@ setup (name = 'pymavlink',
                                                      'CPP11/include_v2.0/*.hpp',
                                                      'CS/common/*.cs',
                                                      'swift/*.swift',],
-                        'pymavlink'              : ['mavnative/*.h',
-                                                    'message_definitions/v*/*.xml']
+                        'pymavlink'              : ['message_definitions/v*/*.xml']
                         },
        packages = ['pymavlink',
                    'pymavlink.generator',
@@ -162,5 +148,4 @@ setup (name = 'pymavlink',
            'future'  # future is required by mavgen, included by this file
        ],
        cmdclass={'build_py': custom_build_py},
-       ext_modules = extensions
        )
