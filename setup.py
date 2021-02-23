@@ -172,7 +172,6 @@ setup (name = 'pymavlink',
        ],
        install_requires=[
             'future',
-            'lxml',
        ],
        setup_requires=[
            'future'  # future is required by mavgen, included by this file
