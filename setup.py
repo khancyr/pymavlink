@@ -191,7 +191,7 @@ setup (name = 'pymavlink',
                                                      'CPP11/include_v2.0/*.hpp',
                                                      'CS/*.*',
                                                      'swift/*.swift',],
-                        'pymavlink'              : ['message_definitions/v*/*.xml']
+                        'pymavlink'              : ['message_definitions/v*/*.xml', 'py.typed']
                         },
        packages = ['pymavlink',
                    'pymavlink.generator',
