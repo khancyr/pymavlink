@@ -14,7 +14,7 @@ import json
 import re
 import platform
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 from pymavlink import mavexpression
 import ssl
 
@@ -33,8 +33,16 @@ except Exception:
 UDP_MAX_PACKET_LEN = 65535
 
 # Store the MAVLink library for the currently-selected dialect
-# (set by set_dialect())
-mavlink: ModuleType | None = None
+# (set by set_dialect()). _mavlink is None only during the brief bootstrap
+# window before the initial set_dialect() call below completes; everywhere
+# else in this module it is guaranteed to be a real module, so the
+# module-level `mavlink` name is exposed as a plain ModuleType to avoid an
+# Optional check at each of its ~90 use sites.
+_mavlink: ModuleType | None = None
+mavlink = cast(ModuleType, _mavlink)
+
+# the dialect name passed to the most recent set_dialect() call
+current_dialect: str | None = None
 
 # Store the mavlink file currently being operated on
 # (set by mavlink_connection())
@@ -111,7 +119,7 @@ def set_dialect(dialect: str, with_type_annotations: bool | None = None) -> None
     '''set the MAVLink dialect to work with.
     For example, set_dialect("ardupilotmega")
     '''
-    global mavlink, current_dialect
+    global _mavlink, mavlink, current_dialect
     from .generator import mavparse
 
     if with_type_annotations is not None:
@@ -120,7 +128,7 @@ def set_dialect(dialect: str, with_type_annotations: bool | None = None) -> None
     if 'MAVLINK20' in os.environ:
         wire_protocol = mavparse.PROTOCOL_2_0
         modname = "pymavlink.dialects.v20." + dialect
-    elif mavlink is None or mavlink.WIRE_PROTOCOL_VERSION == "1.0" or not 'MAVLINK09' in os.environ:
+    elif _mavlink is None or _mavlink.WIRE_PROTOCOL_VERSION == "1.0" or not 'MAVLINK09' in os.environ:
         wire_protocol = mavparse.PROTOCOL_1_0
         modname = "pymavlink.dialects.v10." + dialect
     else:
@@ -138,7 +146,8 @@ def set_dialect(dialect: str, with_type_annotations: bool | None = None) -> None
     for comp in components[1:]:
         mod = getattr(mod, comp)
     current_dialect = dialect
-    mavlink = mod
+    _mavlink = mod
+    mavlink = cast(ModuleType, _mavlink)
 
 # Set the default dialect. This is done here as it needs to be after the function declaration
 set_dialect(os.environ['MAVLINK_DIALECT'])
