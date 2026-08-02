@@ -2052,13 +2052,13 @@ class mavwebsocket_client(mavfile):
         self.fd = None
 
 
-def mavlink_connection(device, baud=115200, source_system=255, source_component=0,
-                       planner_format=None, write=False, append=False,
-                       robust_parsing=True, notimestamps=False, input=True,
-                       dialect=None, autoreconnect=False, zero_time_base=False,
-                       retries=3, use_native=default_native,
-                       force_connected=False, progress_callback=None,
-                       udp_timeout=0, **opts):
+def mavlink_connection(device: str, baud: int = 115200, source_system: int = 255, source_component: int = 0,
+                       planner_format: Any = None, write: bool = False, append: bool = False,
+                       robust_parsing: bool = True, notimestamps: bool = False, input: bool = True,
+                       dialect: str | None = None, autoreconnect: bool = False, zero_time_base: bool = False,
+                       retries: int = 3, use_native: bool = default_native,
+                       force_connected: bool = False, progress_callback: Any = None,
+                       udp_timeout: float = 0, **opts: Any) -> Any:
     '''open a serial, UDP, TCP or file mavlink connection'''
     global mavfile_global
 
@@ -2153,15 +2153,15 @@ def mavlink_connection(device, baud=115200, source_system=255, source_component=
 
 class periodic_event(object):
     '''a class for fixed frequency events'''
-    def __init__(self, frequency):
+    def __init__(self, frequency: float) -> None:
         self.frequency = float(frequency)
         self.last_time = time.time()
 
-    def force(self):
+    def force(self) -> None:
         '''force immediate triggering'''
         self.last_time = 0
-        
-    def trigger(self):
+
+    def trigger(self) -> bool:
         '''return True if we should trigger now'''
         tnow = time.time()
 
@@ -2181,7 +2181,7 @@ try:
 except:
     have_ascii = False
 
-def is_printable(c):
+def is_printable(c: Any) -> bool:
     '''see if a character is printable'''
     if have_ascii:
         return ascii.isprint(c)
@@ -2191,7 +2191,7 @@ def is_printable(c):
         ic = ord(c)
     return ic >= 32 and ic <= 126
 
-def all_printable(buf):
+def all_printable(buf: Any) -> bool:
     '''see if a string is all printable'''
     for c in buf:
         if not is_printable(c) and not c in ['\r', '\n', '\t'] and not c in [ord('\r'), ord('\n'), ord('\t')]:
@@ -2200,12 +2200,12 @@ def all_printable(buf):
 
 class SerialPort(object):
     '''auto-detected serial port'''
-    def __init__(self, device, description=None, hwid=None):
+    def __init__(self, device: str, description: str | None = None, hwid: str | None = None) -> None:
         self.device = device
         self.description = description
         self.hwid = hwid
 
-    def __str__(self):
+    def __str__(self) -> str:
         ret = self.device
         if self.description is not None:
             ret += " : " + self.description
@@ -2213,7 +2213,7 @@ class SerialPort(object):
             ret += " : " + self.hwid
         return ret
 
-def auto_detect_serial_win32(preferred_list=['*']):
+def auto_detect_serial_win32(preferred_list: list[str] = ['*']) -> list[SerialPort]:
     '''try to auto-detect serial ports on win32'''
     try:
         from serial.tools.list_ports_windows import comports
@@ -2241,7 +2241,7 @@ def auto_detect_serial_win32(preferred_list=['*']):
 
         
 
-def auto_detect_serial_unix(preferred_list=['*']):
+def auto_detect_serial_unix(preferred_list: list[str] = ['*']) -> list[SerialPort]:
     '''try to auto-detect serial ports on unix'''
     import glob
     glist = glob.glob('/dev/ttyS*') + glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*') + glob.glob('/dev/serial/by-id/*')
@@ -2266,14 +2266,14 @@ def auto_detect_serial_unix(preferred_list=['*']):
     ret.extend(others)
     return ret
 
-def auto_detect_serial(preferred_list=['*']):
+def auto_detect_serial(preferred_list: list[str] = ['*']) -> list[SerialPort]:
     '''try to auto-detect serial port'''
     # see if 
     if os.name == 'nt':
         return auto_detect_serial_win32(preferred_list=preferred_list)
     return auto_detect_serial_unix(preferred_list=preferred_list)
 
-def mode_string_v09(msg):
+def mode_string_v09(msg: Any) -> str:
     '''mode string for 0.9 protocol'''
     mode = msg.mode
     nav_mode = msg.nav_mode
@@ -2525,7 +2525,7 @@ mainstate_mapping_px4 = {
     12 : 'AUTO_FOLLOW_TARGET',
     13 : 'MAX',
 }
-def mode_string_px4(MainState):
+def mode_string_px4(MainState: int) -> str:
     return mainstate_mapping_px4.get(MainState, "Unknown")
 
 
@@ -2569,7 +2569,7 @@ px4_map = { "MANUAL":        (mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED | mavlin
             "TAKEOFF":       (mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED | auto_mode_flags,                                                                        PX4_CUSTOM_MAIN_MODE_AUTO,        PX4_CUSTOM_SUB_MODE_AUTO_TAKEOFF        )}
 
 
-def interpret_px4_mode(base_mode, custom_mode):
+def interpret_px4_mode(base_mode: int, custom_mode: int) -> str:
     # Dispatch on custom_main_mode (authoritative per PX4's px4_custom_mode.h);
     # base_mode is no longer reliable for mode identity on PX4 v1.12+ (#793).
     del base_mode
@@ -2607,7 +2607,7 @@ def interpret_px4_mode(base_mode, custom_mode):
             return "RTGS"
     return "UNKNOWN"
 
-def mode_mapping_byname(mav_type):
+def mode_mapping_byname(mav_type: int) -> dict[str, int] | None:
     '''return dictionary mapping mode names to numbers, or None if unknown'''
     mode_map = mode_mapping_bynumber(mav_type)
     if mode_map is None:
@@ -2615,12 +2615,12 @@ def mode_mapping_byname(mav_type):
     inv_map = dict((a, b) for (b, a) in mode_map.items())
     return inv_map
 
-def mode_mapping_bynumber(mav_type):
+def mode_mapping_bynumber(mav_type: int) -> dict[int, str] | None:
     '''return dictionary mapping mode numbers to name, or None if unknown'''
     return AP_MAV_TYPE_MODE_MAP[mav_type] if mav_type in AP_MAV_TYPE_MODE_MAP else None
 
 
-def mode_string_v10(msg):
+def mode_string_v10(msg: Any) -> str:
     '''mode string for 1.0 protocol, from heartbeat'''
     if msg.autopilot == mavlink.MAV_AUTOPILOT_PX4:
         if msg.get_type() == "HIGH_LATENCY2":
@@ -2636,13 +2636,13 @@ def mode_string_v10(msg):
         return mode_map[msg.custom_mode]
     return "Mode(%u)" % msg.custom_mode
 
-def mode_string_apm(mode_number):
+def mode_string_apm(mode_number: int) -> str:
     '''return mode string for ArduPlane'''
     if mode_number in mode_mapping_apm:
         return mode_mapping_apm[mode_number]
     return "Mode(%u)" % mode_number
 
-def mode_string_acm(mode_number):
+def mode_string_acm(mode_number: int) -> str:
     '''return mode string for ArduCopter'''
     if mode_number in mode_mapping_acm:
         return mode_mapping_acm[mode_number]
@@ -2651,7 +2651,8 @@ def mode_string_acm(mode_number):
 class MavlinkSerialPort(object):
         '''an object that looks like a serial port, but
         transmits using mavlink SERIAL_CONTROL packets'''
-        def __init__(self, portname, baudrate, devnum=0, devbaud=0, timeout=3, debug=0):
+        def __init__(self, portname: str, baudrate: int, devnum: int = 0, devbaud: int = 0,
+                     timeout: float = 3, debug: int = 0) -> None:
                 from . import mavutil
 
                 self.baudrate = 0
@@ -2667,12 +2668,12 @@ class MavlinkSerialPort(object):
                     self.setBaudrate(devbaud)
                 self.debug("Locked serial device\n")
 
-        def debug(self, s, level=1):
+        def debug(self, s: str, level: int = 1) -> None:
                 '''write some debug text'''
                 if self._debug >= level:
                         print(s)
 
-        def write(self, b):
+        def write(self, b: bytes) -> None:
                 '''write some bytes'''
                 from . import mavutil
                 while len(b) > 0:
@@ -2690,7 +2691,7 @@ class MavlinkSerialPort(object):
                                                          buf)
                         b = b[n:]
 
-        def _recv(self):
+        def _recv(self) -> None:
                 '''read some bytes into self.buf'''
                 from . import mavutil
                 start_time = time.time()
@@ -2715,7 +2716,7 @@ class MavlinkSerialPort(object):
                         data = m.data[:m.count]
                         self.buf.extend(data)
 
-        def read(self, n):
+        def read(self, n: int) -> bytearray:
                 '''read some bytes'''
                 if len(self.buf) == 0:
                         self._recv()
@@ -2727,7 +2728,7 @@ class MavlinkSerialPort(object):
                         return ret
                 return bytearray()
 
-        def flushInput(self):
+        def flushInput(self) -> None:
                 '''flush any pending input'''
                 self.buf = bytearray()
                 saved_timeout = self.timeout
@@ -2737,7 +2738,7 @@ class MavlinkSerialPort(object):
                 self.buf = bytearray()
                 self.debug("flushInput")
 
-        def setBaudrate(self, baudrate):
+        def setBaudrate(self, baudrate: int) -> None:
                 '''set baudrate'''
                 from . import mavutil
                 if self.baudrate == baudrate:
@@ -2751,7 +2752,7 @@ class MavlinkSerialPort(object):
                 self.flushInput()
                 self.debug("Changed baudrate %u" % self.baudrate)
 
-def decode_bitmask(messagetype, field, value):
+def decode_bitmask(messagetype: str, field: str, value: int) -> list[Any]:
     try:
         _class = eval("mavlink.MAVLink_%s_message" % messagetype.lower())
     except AttributeError as e:
@@ -2776,7 +2777,7 @@ def decode_bitmask(messagetype, field, value):
         raise AttributeError("Did not find specified enumeration (%s)" % enum_name)
 
     class EnumBitInfo(object):
-        def __init__(self, offset, value, name):
+        def __init__(self, offset: int, value: bool, name: str | None) -> None:
             self.offset = offset
             self.value = value
             self.name = name
@@ -2812,7 +2813,7 @@ dump_message_unit_decoder = {
     "mV":     [1000.0,     "V"]
 }
 
-def dump_message_verbose(f, m):
+def dump_message_verbose(f: Any, m: Any) -> None:
     '''write an excruciatingly detailed dump of message m to file descriptor f'''
     try:
         # __getattr__ may be overridden on m, thus this try/except
@@ -2926,9 +2927,3 @@ def dump_message_verbose(f, m):
             pass
 
         f.write("    %s: %s\n" % (fieldname, value))
-
-
-if __name__ == '__main__':
-        serial_list = auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*", '*PX4*', '*FMU*'])
-        for port in serial_list:
-            print("%s" % port)
