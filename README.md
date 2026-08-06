@@ -106,6 +106,26 @@ Or:
 python3 -m pip install .
 ```
 
+#### Editor completion and type checking
+
+The dialect modules under `dialects/v10/` and `dialects/v20/` are generated
+rather than committed, so a fresh clone does not have them yet. Until they
+exist, editors and type checkers cannot see the MAVLink message classes or
+enums, and everything reached through `mavutil.mavlink` falls back to untyped.
+The developer install above generates them into the checkout.
+
+To generate just the module the type annotations point at, without a full
+install:
+
+```bash
+MAVLINK20=1 MDEF=$PWD/../mavlink/message_definitions PYTHONPATH=.. \
+  python3 -c "from pymavlink import mavutil"
+```
+
+This uses the lazy fallback in `set_dialect()` to write `dialects/v20/all.py`.
+Once it exists, `mavutil.mavlink.<TAB>` completes and message construction and
+field access are type-checked.
+
 ## Running the tests
 
 From inside the pymavlink directory, fetch the message definitions alongside
