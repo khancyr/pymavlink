@@ -13,8 +13,7 @@ import copy
 import json
 import re
 import platform
-from types import ModuleType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from pymavlink import mavexpression
 import ssl
 
@@ -33,8 +32,19 @@ except Exception:
 UDP_MAX_PACKET_LEN = 65535
 
 # Store the MAVLink library for the currently-selected dialect
-# (set by set_dialect())
-mavlink: ModuleType | None = None
+# (set_dialect() rebinds this name at runtime).
+#
+# For type checkers and IDEs the name is pinned to the v2.0 "all" dialect. That
+# module is a strict superset of every generated dialect: v1.0 dialects omit all
+# messages with an id above 255 and omit v2 extension fields, and "all" is the
+# union of every XML. It is also what mavutil ends up using in practice, since a
+# 0xFD byte on the wire flips us to MAVLINK20 (see auto_mavlink_version below).
+# This import never executes at runtime; mavlink starts as None so the bootstrap
+# check in set_dialect() still works.
+if TYPE_CHECKING:
+    from pymavlink.dialects.v20 import all as mavlink
+else:
+    mavlink = None
 
 # Store the mavlink file currently being operated on
 # (set by mavlink_connection())
@@ -127,6 +137,10 @@ def set_dialect(dialect: str, with_type_annotations: bool | None = None) -> None
         wire_protocol = mavparse.PROTOCOL_0_9
         modname = "pymavlink.dialects.v09." + dialect
 
+    # declared as Any so rebinding mavlink below is accepted by every type
+    # checker: mavlink is statically a module alias, and __import__() returns
+    # ModuleType, which is not assignable to it.
+    mod: Any
     try:
         mod = __import__(modname)
     except Exception:
@@ -161,13 +175,13 @@ class mavfile_state(object):
                 # may be using a minimal dialect
                 pass
             try:
-                mavlink.MAVLink_waypoint_message = mavlink.MAVLink_mission_item_message
+                mavlink.MAVLink_waypoint_message = mavlink.MAVLink_mission_item_message  # type: ignore[attr-defined]  # legacy alias, created at runtime
             except AttributeError:
                 # may be using a minimal dialect
                 pass
         else:
             try:
-                self.messages['HOME'] = mavlink.MAVLink_gps_raw_message(0,0,0,0,0,0,0,0,0)
+                self.messages['HOME'] = mavlink.MAVLink_gps_raw_message(0,0,0,0,0,0,0,0,0)  # type: ignore[attr-defined]  # v0.9-only message
             except AttributeError:
                 # may be using a minimal dialect
                 pass
