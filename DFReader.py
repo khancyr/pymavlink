@@ -1045,13 +1045,13 @@ class DFReader(object):
                 return None
             if type is not None and not m.get_type() in type:
                 continue
-            if not mavutil.evaluate_condition(condition, self.messages):
+            if not mavutil.evaluate_condition(condition, self.messages, mav=self):
                 continue
             return m
 
     def check_condition(self, condition):
         '''check if a condition is true'''
-        return mavutil.evaluate_condition(condition, self.messages)
+        return mavutil.evaluate_condition(condition, self.messages, mav=self)
 
     def param(self, name, default=None):
         '''convenient function for returning an arbitrary MAVLink

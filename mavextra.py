@@ -30,7 +30,7 @@ def kmh(mps):
 def altitude(SCALED_PRESSURE, ground_pressure=None, ground_temp=None):
     '''calculate barometric altitude'''
     from . import mavutil
-    self = mavutil.mavfile_global
+    self = mavutil.current_mavfile()
     if ground_pressure is None:
         if self.param('GND_ABS_PRESS', None) is None:
             return 0
@@ -44,7 +44,7 @@ def altitude(SCALED_PRESSURE, ground_pressure=None, ground_temp=None):
 def altitude2(SCALED_PRESSURE, ground_pressure=None, ground_temp=None):
     '''calculate barometric altitude'''
     from . import mavutil
-    self = mavutil.mavfile_global
+    self = mavutil.current_mavfile()
     if ground_pressure is None:
         if self.param('GND_ABS_PRESS', None) is None:
             return 0
@@ -59,7 +59,7 @@ def mag_heading(RAW_IMU, ATTITUDE, declination=None, SENSOR_OFFSETS=None, ofs=No
     '''calculate heading from raw magnetometer'''
     if declination is None:
         from . import mavutil
-        declination = degrees(mavutil.mavfile_global.param('COMPASS_DEC', 0))
+        declination = degrees(mavutil.current_mavfile().param('COMPASS_DEC', 0))
     mag_x = RAW_IMU.xmag
     mag_y = RAW_IMU.ymag
     mag_z = RAW_IMU.zmag
@@ -96,7 +96,7 @@ def mag_heading_df(MAG, ATT, declination=None, ofs=None, diagonals=(1.0,1.0,1.0)
     '''calculate heading from raw magnetometer'''
     if declination is None:
         from pymavlink import mavutil
-        declination = degrees(mavutil.mavfile_global.param('COMPASS_DEC', 0))
+        declination = degrees(mavutil.current_mavfile().param('COMPASS_DEC', 0))
     mag = Vector3(MAG.MagX,MAG.MagY,MAG.MagZ)
     if ofs is not None:
         mag += Vector3(ofs[0],ofs[1],ofs[2]) - Vector3(MAG.OfsX, MAG.OfsY, MAG.OfsZ)
@@ -130,7 +130,7 @@ def mag_heading_motors(RAW_IMU, ATTITUDE, declination, SENSOR_OFFSETS, ofs, SERV
 
     if declination is None:
         from . import mavutil
-        declination = degrees(mavutil.mavfile_global.param('COMPASS_DEC', 0))
+        declination = degrees(mavutil.current_mavfile().param('COMPASS_DEC', 0))
     mag_x = RAW_IMU.xmag
     mag_y = RAW_IMU.ymag
     mag_z = RAW_IMU.zmag
@@ -168,7 +168,7 @@ def mag_field_df(MAG, ofs=None):
 def get_motor_offsets(SERVO_OUTPUT_RAW, ofs, motor_ofs):
     '''calculate magnetic field strength from raw magnetometer'''
     from . import mavutil
-    self = mavutil.mavfile_global
+    self = mavutil.current_mavfile()
 
     m = SERVO_OUTPUT_RAW
     motor_pwm = m.servo1_raw + m.servo2_raw + m.servo3_raw + m.servo4_raw
@@ -228,7 +228,7 @@ derivative_data = {}
 def second_derivative_5(var, key):
     '''5 point 2nd derivative'''
     from . import mavutil
-    tnow = mavutil.mavfile_global.timestamp
+    tnow = mavutil.current_mavfile().timestamp
 
     if not key in derivative_data:
         derivative_data[key] = (tnow, [var]*5)
@@ -246,7 +246,7 @@ def second_derivative_5(var, key):
 def second_derivative_9(var, key):
     '''9 point 2nd derivative'''
     from . import mavutil
-    tnow = mavutil.mavfile_global.timestamp
+    tnow = mavutil.current_mavfile().timestamp
 
     if not key in derivative_data:
         derivative_data[key] = (tnow, [var]*9)
@@ -313,7 +313,7 @@ def delta(var, key, tusec=None):
         tnow = tusec * 1.0e-6
     else:
         from . import mavutil
-        tnow = mavutil.mavfile_global.timestamp
+        tnow = mavutil.current_mavfile().timestamp
     ret = 0
     if key in last_delta:
         (last_v, last_t, last_ret) = last_delta[key]
@@ -357,7 +357,7 @@ def delta_angle(var, key, tusec=None):
         tnow = tusec * 1.0e-6
     else:
         from . import mavutil
-        tnow = mavutil.mavfile_global.timestamp
+        tnow = mavutil.current_mavfile().timestamp
     dv = 0
     ret = 0
     if key in last_delta:
@@ -495,7 +495,7 @@ def get_origin():
   if ORGN is not None:
       return ORGN
   from . import mavutil
-  self = mavutil.mavfile_global
+  self = mavutil.current_mavfile()
   ret = self.messages.get('ORGN', None)
   if ret is None:
       ret = self.messages.get('GPS', None)
@@ -603,7 +603,7 @@ def wingloading(bank):
 def airspeed(VFR_HUD, ratio=None, used_ratio=None, offset=None):
     '''recompute airspeed with a different ARSPD_RATIO'''
     from . import mavutil
-    mav = mavutil.mavfile_global
+    mav = mavutil.current_mavfile()
     if ratio is None:
         ratio = 1.9936 # APM default
     if used_ratio is None:
@@ -670,7 +670,7 @@ def airspeed_tas(VFR_HUD,GLOBAL_POSITION_INT):
 def airspeed_ratio(VFR_HUD):
     '''recompute airspeed with a different ARSPD_RATIO'''
     from . import mavutil
-    mav = mavutil.mavfile_global
+    mav = mavutil.current_mavfile()
     airspeed_pressure = (VFR_HUD.airspeed**2) / ratio
     airspeed = sqrt(airspeed_pressure * ratio)
     return airspeed
@@ -678,7 +678,7 @@ def airspeed_ratio(VFR_HUD):
 def airspeed_voltage(VFR_HUD, ratio=None):
     '''back-calculate the voltage the airspeed sensor must have seen'''
     from . import mavutil
-    mav = mavutil.mavfile_global
+    mav = mavutil.current_mavfile()
     if ratio is None:
         ratio = 1.9936 # APM default
     if 'ARSPD_RATIO' in mav.params:
@@ -987,7 +987,7 @@ def armed(HEARTBEAT):
     '''return 1 if armed, 0 if not'''
     from . import mavutil
     if HEARTBEAT.type == mavutil.mavlink.MAV_TYPE_GCS:
-        self = mavutil.mavfile_global
+        self = mavutil.current_mavfile()
         if self.motors_armed():
             return 1
         return 0
@@ -1079,7 +1079,7 @@ def ekf1_pos(EKF1):
   '''calculate EKF position when EKF disabled'''
   global ekf_origin
   from . import mavutil
-  self = mavutil.mavfile_global
+  self = mavutil.current_mavfile()
   if ekf_origin is None:
       # Look for the ORGN[0] message explicitly
       if not 'ORGN[0]' in self.messages:
@@ -1207,7 +1207,7 @@ def armed(HEARTBEAT):
     '''return 1 if armed, 0 if not'''
     from pymavlink import mavutil
     if HEARTBEAT.type == mavutil.mavlink.MAV_TYPE_GCS:
-        self = mavutil.mavfile_global
+        self = mavutil.current_mavfile()
         if self.motors_armed():
             return 1
         return 0

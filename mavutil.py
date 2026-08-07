@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import socket, math, struct, time, os, fnmatch, array, sys, errno
 import select
+import contextvars
 import copy
 import json
 import re
@@ -46,9 +47,49 @@ if TYPE_CHECKING:
 else:
     mavlink = None
 
-# Store the mavlink file currently being operated on
-# (set by mavlink_connection())
-mavfile_global: mavfile | None = None
+# The ambient connection expression helpers read state from. Spelled loosely
+# because mavlink_connection() hands back mavfile subclasses, DFReader and
+# CSVReader, which share no common base class; the helpers only ever need
+# .param(), .timestamp, .messages and .motors_armed off it.
+MavfileLike = Any
+
+# The most recently opened input connection.
+#
+# Kept as a module attribute because external code reads it directly, and
+# because expressions evaluated without a known connection (tools/mavgraph.py
+# and tools/mavkml.py call evaluate_expression() with only a vars dict) have
+# nothing else to fall back to. Prefer current_mavfile() over reading this.
+mavfile_global: MavfileLike | None = None
+
+# The connection an expression currently being evaluated belongs to.
+#
+# Expressions are eval()'d strings, so the mavextra helpers they call cannot be
+# passed the connection as an argument - they have to reach for it out of band.
+# Carrying it here for the duration of an evaluation means that when the caller
+# does know which connection the messages came from, interleaved connections no
+# longer read each other's parameters and timestamps; mavfile_global alone is
+# process-wide and last-opened-wins.
+_mavfile_ctx: contextvars.ContextVar[MavfileLike] = contextvars.ContextVar("mavfile")
+
+def current_mavfile() -> MavfileLike:
+    '''return the connection expression helpers should read state from.
+
+    Prefers the connection scoped to the evaluation in progress, falling back to
+    the most recently opened input connection.
+
+    Raises rather than returning None so that callers do not have to guard: every
+    caller dereferences the result immediately, and answering with a permissive
+    stand-in would turn a missing connection into silently wrong numbers rather
+    than an error.
+    '''
+    mav = _mavfile_ctx.get(None)
+    if mav is None:
+        mav = mavfile_global
+    if mav is None:
+        raise RuntimeError(
+            "no mavlink connection is available: mavextra expression helpers "
+            "read parameters and timestamps from an open mavlink_connection()")
+    return mav
 
 # If the caller hasn't specified a particular native/legacy version, use this
 default_native = False
@@ -68,15 +109,27 @@ def mavlink20() -> bool:
     '''return True if using MAVLink 2.0'''
     return 'MAVLINK20' in os.environ
 
-def evaluate_expression(expression: str, vars: dict, nocondition: bool = False) -> Any:
-    '''evaluation an expression'''
-    return mavexpression.evaluate_expression(expression, vars, nocondition)
+def evaluate_expression(expression: str, vars: dict, nocondition: bool = False,
+                        mav: MavfileLike | None = None) -> Any:
+    '''evaluation an expression
 
-def evaluate_condition(condition: str | None, vars: dict) -> Any:
+    Pass mav when the connection the messages came from is known, so that any
+    mavextra helper the expression calls reads state from that connection rather
+    than from whichever was opened most recently.
+    '''
+    if mav is None:
+        return mavexpression.evaluate_expression(expression, vars, nocondition)
+    token = _mavfile_ctx.set(mav)
+    try:
+        return mavexpression.evaluate_expression(expression, vars, nocondition)
+    finally:
+        _mavfile_ctx.reset(token)
+
+def evaluate_condition(condition: str | None, vars: dict, mav: MavfileLike | None = None) -> Any:
     '''evaluation a conditional (boolean) statement'''
     if condition is None:
         return True
-    v = evaluate_expression(condition, vars)
+    v = evaluate_expression(condition, vars, mav=mav)
     if v is None:
         return False
     return v
@@ -556,16 +609,16 @@ class mavfile(object):
             if type is not None and not m.get_type() in type:
                 continue
             if hasattr(m, "get_srcSystem"):
-                if m.get_srcSystem() not in self.sysid_state or not evaluate_condition(condition, self.sysid_state[m.get_srcSystem()].messages):
+                if m.get_srcSystem() not in self.sysid_state or not evaluate_condition(condition, self.sysid_state[m.get_srcSystem()].messages, mav=self):
                     continue
             else:
-                if not evaluate_condition(condition, self.messages):
+                if not evaluate_condition(condition, self.messages, mav=self):
                     continue
             return m
 
     def check_condition(self, condition):
         '''check if a condition is true'''
-        return evaluate_condition(condition, self.messages)
+        return evaluate_condition(condition, self.messages, mav=self)
 
     def mavlink10(self):
         '''return True if using MAVLink 1.0 or later'''
@@ -1712,10 +1765,10 @@ class mavmmaplog(mavlogfile):
             if type is not None and not m.get_type() in type:
                 continue
             if hasattr(m, "get_srcSystem"):
-                if m.get_srcSystem() not in self.sysid_state or not evaluate_condition(condition, self.sysid_state[m.get_srcSystem()].messages):
+                if m.get_srcSystem() not in self.sysid_state or not evaluate_condition(condition, self.sysid_state[m.get_srcSystem()].messages, mav=self):
                     continue
             else:
-                if not evaluate_condition(condition, self.messages):
+                if not evaluate_condition(condition, self.messages, mav=self):
                     continue
             return m
         
