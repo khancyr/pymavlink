@@ -1279,7 +1279,9 @@ class mavtcp(mavfile):
         self.port.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
 
     def close(self):
-        self.port.close()
+        if self.port is not None:
+            self.port.close()
+            self.port = None
 
     def handle_disconnect(self):
         print("Connection reset or closed by peer on TCP socket")
@@ -1293,6 +1295,11 @@ class mavtcp(mavfile):
     def recv(self,n=None):
         if self.port is None:
             self.reconnect()
+        if self.port is None:
+            # reconnect() is a no-op unless autoreconnect was requested, so the
+            # socket may still be gone; treat that the same as "no data yet"
+            # rather than raising deeper in self.port.recv() below.
+            return b""
         if n is None:
             n = self.mav.bytes_needed()
         try:
