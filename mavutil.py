@@ -1247,6 +1247,9 @@ class mavtcp(mavfile):
 
         self.autoreconnect = autoreconnect
 
+        # set before do_connect() so reconnect() can consult it at any point
+        self.closed = False
+
         self.retries = retries
         self.do_connect()
 
@@ -1278,10 +1281,20 @@ class mavtcp(mavfile):
         set_close_on_exec(self.port.fileno())
         self.port.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
 
-    def close(self):
+    def _close_port(self):
+        '''drop the socket, leaving self.port as None'''
         if self.port is not None:
             self.port.close()
             self.port = None
+
+    def close(self):
+        '''close the connection for good
+
+        Unlike the teardown reconnect() does, this is final: an autoreconnect
+        connection must not resurrect itself on the next recv()/write().
+        '''
+        self.closed = True
+        self._close_port()
 
     def handle_disconnect(self):
         print("Connection reset or closed by peer on TCP socket")
@@ -1331,11 +1344,12 @@ class mavtcp(mavfile):
             pass
 
     def reconnect(self):
+        if self.closed:
+            # close() was called; do not reopen the link behind the caller's back
+            return
         if self.autoreconnect:
             print("Attempting reconnect")
-            if self.port is not None:
-                self.port.close()
-                self.port = None
+            self._close_port()
             self.do_connect()
 
 

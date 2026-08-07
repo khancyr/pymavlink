@@ -104,22 +104,31 @@ class MavtcpTest(unittest.TestCase):
         # must not raise; with autoreconnect=False there is nothing to write to
         self.conn.write(b"test")
 
-    def test_autoreconnect_reestablishes_connection(self):
-        '''autoreconnect=True reconnects on recv() after the link is gone'''
-        # a plain socket listener rather than mavtcpin: this needs two
-        # successive server-side connections, and mavtcpin only tracks one at a
-        # time and re-accepts only after its own recv() hits an error. settimeout
-        # also makes accept() block up to TIMEOUT, so no polling is needed.
+    def plain_listener(self):
+        '''a plain socket listener, for tests needing two successive accepts
+
+        mavtcpin tracks only one accepted connection at a time and re-accepts
+        only after its own recv() hits an error, so it cannot serve these.
+        settimeout() lets accept() block up to TIMEOUT, so no polling is needed.
+        '''
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.addCleanup(listener.close)
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind(('127.0.0.1', 0))
         listener.listen(2)
         listener.settimeout(self.TIMEOUT)
+        return listener, listener.getsockname()[1]
 
-        conn = mavutil.mavlink_connection(
-            'tcp:127.0.0.1:%u' % listener.getsockname()[1], autoreconnect=True)
+    def autoreconnect_conn(self, port_num):
+        conn = mavutil.mavlink_connection('tcp:127.0.0.1:%u' % port_num,
+                                          autoreconnect=True)
         self.addCleanup(conn.close)
+        return conn
+
+    def test_autoreconnect_reestablishes_connection(self):
+        '''autoreconnect=True reconnects on recv() after the link is gone'''
+        listener, port_num = self.plain_listener()
+        conn = self.autoreconnect_conn(port_num)
         (first, _addr) = listener.accept()
         self.addCleanup(first.close)
 
@@ -134,6 +143,40 @@ class MavtcpTest(unittest.TestCase):
         self.addCleanup(second.close)
         second.send(b"again")
         self.assertEqual(self.recv_some(conn), b"again")
+
+    def test_close_is_final_for_autoreconnect(self):
+        '''close() must not be undone by a later write()/recv()'''
+        listener, port_num = self.plain_listener()
+        conn = self.autoreconnect_conn(port_num)
+        (first, _addr) = listener.accept()
+        self.addCleanup(first.close)
+
+        conn.close()
+        conn.write(b"hello")
+        conn.recv()
+
+        self.assertIsNone(conn.port, "close() was undone")
+        # a short wait is enough to show nothing reconnected
+        listener.settimeout(0.3)
+        with self.assertRaises((socket.timeout, TimeoutError)):
+            listener.accept()
+
+    def test_eof_after_close_does_not_reconnect(self):
+        '''the disconnect handlers must not resurrect a closed connection'''
+        listener, port_num = self.plain_listener()
+        conn = self.autoreconnect_conn(port_num)
+        (first, _addr) = listener.accept()
+        self.addCleanup(first.close)
+
+        conn.close()
+        # both handlers funnel into reconnect()
+        conn.handle_eof()
+        conn.handle_disconnect()
+
+        self.assertIsNone(conn.port)
+        listener.settimeout(0.3)
+        with self.assertRaises((socket.timeout, TimeoutError)):
+            listener.accept()
 
 
 if __name__ == '__main__':
